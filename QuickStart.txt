@@ -1,0 +1,41 @@
+ARMS RACE TRACKER — WINDOWS QUICK START
+
+1. Extract the complete ArmsRaceTracker-Windows.zip folder.
+2. Sign into your own Steam account and open ArmsRaceTracker.exe.
+   Setup detects the active Steam account and CS2 installation.
+3. In Steam, open Counter-Strike 2 / Properties / Launch Options.
+   Add -condebug, keeping any existing launch options.
+4. Fully restart CS2 after the first setup.
+5. Play online Arms Race with the tracker running.
+
+The desktop interface is currently in German:
+  GEZAEHLTE ONLINE-SIEGE: tracked online wins
+  LETZTER SIEG: last win
+  UEBUNG AUSGESCHLOSSEN: excluded practice games
+  MATCHVERLAUF: match history
+  Sieg: win
+  Kein Sieg: no win
+  Uebung ignoriert: practice excluded
+  Noch ungeprueft: unverified
+
+HUD CONTROLS
+Ctrl + Alt + H: switch between the main window and HUD.
+Ctrl + Alt + L: lock/unlock mouse click-through.
+Drag the unlocked HUD to move it.
+Use the Windows notification-area icon for the same commands.
+Use Fullscreen Windowed in CS2 to display the HUD above the game.
+
+Closing the display leaves the receiver running in the background.
+Stop.cmd stops the receiver; Start.cmd starts it again.
+After restarting Windows, open the GUI or Start.cmd again.
+
+Only your own detected online Arms Race wins increase the total.
+Local practice games are excluded, even if you win them.
+Unknown results remain outside the win total.
+Old wins are not downloaded from Steam.
+
+Data stays in data/; settings.json contains personal setup information.
+Give other players a fresh release ZIP, never your configured live folder.
+No Steam Web API key is required.
+
+See README.md for limitations, source builds, and privacy details.

@@ -1,0 +1,22 @@
+name: Check tracker
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test match detection and connection filtering
+        run: node --test tests/counter.test.cjs
+      - name: Build Windows GUI
+        shell: powershell
+        run: ./Build.ps1

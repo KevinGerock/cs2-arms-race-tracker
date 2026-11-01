@@ -1,0 +1,37 @@
+ARMS RACE TRACKER
+
+Das komplette portable ZIP entpacken und ArmsRaceTracker.exe starten.
+Auf einem neuen Rechner zuerst in Steam anmelden. Die Einrichtung erkennt
+den aktiven Steam-Account und den CS2-Ordner automatisch.
+
+In Steam unter Counter-Strike 2 / Eigenschaften / Startoptionen
+den Parameter -condebug ergaenzen. Vorhandene Parameter beibehalten.
+CS2 nach der ersten Einrichtung vollstaendig neu starten.
+
+GUI und HUD
+Strg + Alt + H: Fenster / HUD wechseln
+Strg + Alt + L: HUD sperren / entsperren
+Das entsperrte HUD kann mit der Maus verschoben werden.
+Das gesperrte HUD laesst Mausklicks zum Spiel durch.
+Das Tracker-Symbol im Windows-Infobereich bietet dieselben Befehle.
+Fuer die HUD-Anzeige CS2 auf Vollbild-Fenster stellen.
+
+Die Anzeige schliessen beendet nicht den Hintergrundzaehler.
+Stop.cmd beendet den Empfaenger. Start.cmd startet ihn wieder.
+Nach einem Windows-Neustart die GUI oder Start.cmd erneut oeffnen.
+
+Nur eigene Siege in erkannten Online-Arms-Race-Matches werden gezaehlt.
+Lokale Uebungsspiele werden ausgeschlossen, auch wenn du sie gewinnst.
+Unklare Ergebnisse bleiben im Verlauf ausserhalb der Siegsumme.
+Historische Siege werden nicht von Steam nachgeladen.
+
+Alle Tracker-Daten bleiben im Ordner data. settings.json enthaelt die
+persoenliche Einrichtung. Fuer einen anderen Spieler ein frisches
+portables ZIP verwenden, NICHT den eigenen laufenden Programmordner kopieren.
+Der Quellcode ist fuer GitHub vorbereitet; private Daten sind ausgeschlossen.
+
+Die Laufzeit schreibt keine Bildschirm-, Audio- oder Videoaufnahmen.
+CS2 schreibt durch -condebug sein Konsolenlog lokal. Der Tracker wertet
+daraus ausschliesslich Verbindungsinformationen aus.
+
+Weitere Informationen: README.md

@@ -1,0 +1,9 @@
+{
+  "name": "arms-race-tracker",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Local Windows GUI and HUD for tracking CS2 Arms Race wins through GSI, with local practice exclusion.",
+  "license": "MIT",
+  "engines": { "node": ">=20.10" },
+  "scripts": { "start": "node counter.cjs", "test": "node --test tests/counter.test.cjs" }
+}
