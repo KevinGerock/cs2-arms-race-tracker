@@ -8,15 +8,10 @@ ARMS RACE TRACKER — WINDOWS QUICK START
 4. Fully restart CS2 after the first setup.
 5. Play online Arms Race with the tracker running.
 
-The desktop interface is currently in German:
-  GEZAEHLTE ONLINE-SIEGE: tracked online wins
-  LETZTER SIEG: last win
-  UEBUNG AUSGESCHLOSSEN: excluded practice games
-  MATCHVERLAUF: match history
-  Sieg: win
-  Kein Sieg: no win
-  Uebung ignoriert: practice excluded
-  Noch ungeprueft: unverified
+LANGUAGE
+The entire interface defaults to English. Choose English, Deutsch, or Dansk
+in the window header. Your selection also updates the HUD and is saved.
+All language packs ship with the app; no download is needed to switch.
 
 HUD CONTROLS
 Ctrl + Alt + H: switch between the main window and HUD.
@@ -24,6 +19,8 @@ Ctrl + Alt + L: lock/unlock mouse click-through.
 Drag the unlocked HUD to move it.
 Use the Windows notification-area icon for the same commands.
 Use Fullscreen Windowed in CS2 to display the HUD above the game.
+Exclusive fullscreen can hide the HUD. Click Show HUD or press Ctrl + Alt + H.
+The app restores the last selected window/HUD view on the next launch.
 
 Closing the display leaves the receiver running in the background.
 Stop.cmd stops the receiver; Start.cmd starts it again.

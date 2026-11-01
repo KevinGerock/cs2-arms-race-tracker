@@ -32,6 +32,7 @@ namespace ArmsRaceTracker {
 
   sealed class TrackerUi {
     readonly string root;
+    readonly Translations translations;
     readonly JavaScriptSerializer json = new JavaScriptSerializer();
     readonly HttpClient client = new HttpClient();
     readonly Window main;
@@ -45,6 +46,8 @@ namespace ArmsRaceTracker {
     string expectedSteamid = "";
     IntPtr mainHandle;
     bool hotkeyH, hotkeyL;
+    object lastSummary;
+    bool startWithHud;
 
     static object Value(object source, string key) {
       var dictionary = source as Dictionary<string, object>;
@@ -59,20 +62,21 @@ namespace ArmsRaceTracker {
       int number;
       return int.TryParse(Text(source, key), out number) ? number : 0;
     }
-    static string MapName(string map) {
-      if (string.IsNullOrEmpty(map)) return "Hauptmenü";
+    string T(string key, params object[] args) { return translations.Get(key,args); }
+    string MapName(string map) {
+      if (string.IsNullOrEmpty(map)) return T("mainMenu");
       switch (map) {
         case "ar_baggage": return "Baggage";
         case "ar_pool_day": return "Pool Day";
-        case "ar_shoots": return "Shoots";
-        case "ar_shoots_night": return "Shoots Night";
+        case "ar_shoots": return T("mapShoots");
+        case "ar_shoots_night": return T("mapShootsNight");
         default: return map.Replace("ar_", "").Replace('_', ' ');
       }
     }
-    static string LocalTime(string value, string format) {
+    string LocalTime(string value, string format) {
       DateTimeOffset time;
       return DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out time)
-        ? time.ToLocalTime().ToString(format, CultureInfo.GetCultureInfo("de-DE")) : "";
+        ? time.ToLocalTime().ToString(T(format), translations.Culture) : "";
     }
     static Brush Brush(string value) { return (Brush)new BrushConverter().ConvertFromString(value); }
     TextBlock Label(Window window, string name) { return (TextBlock)window.FindName(name); }
@@ -87,6 +91,7 @@ namespace ArmsRaceTracker {
 
     public TrackerUi(string directory) {
       root = directory;
+      translations = new Translations(root);
       client.Timeout = TimeSpan.FromMilliseconds(900);
       var settingsPath = Path.Combine(root, "settings.json");
       if (File.Exists(settingsPath)) {
@@ -123,8 +128,30 @@ namespace ArmsRaceTracker {
       };
       main.Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (!exiting) { e.Cancel = true; Exit(); } };
       RestorePosition();
+      var languages = (ComboBox)main.FindName("LanguageSelector");
+      languages.ItemsSource = translations.Languages;
+      languages.SelectedItem = translations.Languages.First(pack => pack.code == translations.Code);
+      ApplyLanguage();
+      languages.SelectionChanged += delegate {
+        var selected = languages.SelectedItem as LanguagePack;
+        if (selected == null || selected.code == translations.Code) return;
+        translations.Select(selected.code);
+        ApplyLanguage();
+        SavePosition();
+      };
       timer.Interval = TimeSpan.FromSeconds(1);
       timer.Tick += async delegate { await Refresh(); };
+    }
+
+    void ApplyLanguage() {
+      main.Language = System.Windows.Markup.XmlLanguage.GetLanguage(translations.Culture.IetfLanguageTag);
+      hud.Language = main.Language;
+      translations.Apply(main); translations.Apply(hud);
+      main.Title = T("appTitle"); hud.Title = T("hudTitle");
+      ApplyLock();
+      if (tray != null) BuildTrayMenu();
+      historyFingerprint = "";
+      if (lastSummary != null) Update(lastSummary);
     }
 
     static bool IsButton(DependencyObject element) {
@@ -142,17 +169,17 @@ namespace ArmsRaceTracker {
       return IntPtr.Zero;
     }
     void ApplyLock() {
+      Set(hud, "HudLockState", locked ? T("locked") : T("movable"));
       var handle = new WindowInteropHelper(hud).Handle;
       if (handle == IntPtr.Zero) return;
       int style = Native.GetWindowLong(handle, -20);
       const int transparent = 0x20, noActivate = 0x08000000;
       Native.SetWindowLong(handle, -20, locked ? style | transparent | noActivate : style & ~transparent & ~noActivate);
-      Set(hud, "HudLockState", locked ? "Gesperrt" : "Verschiebbar");
       ((Button)hud.FindName("HudLockButton")).Opacity = locked ? 0.4 : 1;
     }
     void ToggleLock() { locked = !locked; ApplyLock(); SavePosition(); }
-    void ShowHud() { main.Hide(); hud.Show(); ApplyLock(); }
-    void ShowMain() { hud.Hide(); main.Show(); main.WindowState = WindowState.Normal; main.Activate(); }
+    void ShowHud() { main.Hide(); hud.Show(); ApplyLock(); SavePosition(); }
+    void ShowMain() { hud.Hide(); main.Show(); main.WindowState = WindowState.Normal; main.Activate(); SavePosition(); }
     void RestorePosition() {
       hud.Left = SystemParameters.WorkArea.Right - hud.Width - 24;
       hud.Top = SystemParameters.WorkArea.Top + 110;
@@ -160,6 +187,8 @@ namespace ArmsRaceTracker {
       if (!File.Exists(filename)) return;
       try {
         var settings = json.DeserializeObject(File.ReadAllText(filename));
+        translations.Select(Text(settings,"language","en"));
+        startWithHud = Text(settings,"showHud").Equals("True",StringComparison.OrdinalIgnoreCase);
         double left = Convert.ToDouble(Value(settings, "left"), CultureInfo.InvariantCulture);
         double top = Convert.ToDouble(Value(settings, "top"), CultureInfo.InvariantCulture);
         if (left >= SystemParameters.VirtualScreenLeft && left + hud.Width <= SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth && top >= SystemParameters.VirtualScreenTop && top + hud.Height <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight) {
@@ -171,7 +200,7 @@ namespace ArmsRaceTracker {
     void SavePosition() {
       try {
         Directory.CreateDirectory(Path.Combine(root, "data"));
-        File.WriteAllText(Path.Combine(root, "data", "ui-settings.json"), json.Serialize(new { left = hud.Left, top = hud.Top, locked = locked }));
+        File.WriteAllText(Path.Combine(root, "data", "ui-settings.json"), json.Serialize(new { left = hud.Left, top = hud.Top, locked = locked, language = translations.Code, showHud = hud.IsVisible }), new System.Text.UTF8Encoding(false));
       } catch { }
     }
     void CreateTray() {
@@ -188,17 +217,22 @@ namespace ArmsRaceTracker {
         using (var original = System.Drawing.Icon.FromHandle(handle)) tray.Icon = (System.Drawing.Icon)original.Clone();
         Native.DestroyIcon(handle);
       }
-      tray.Text = "Arms Race Tracker";
+      tray.Text = T("appTitle");
       main.Icon = Imaging.CreateBitmapSourceFromHIcon(tray.Icon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-      var menu = new Forms.ContextMenuStrip();
-      menu.Items.Add("Fenster öffnen", null, delegate { main.Dispatcher.Invoke(new Action(ShowMain)); });
-      menu.Items.Add("HUD anzeigen", null, delegate { main.Dispatcher.Invoke(new Action(ShowHud)); });
-      menu.Items.Add("HUD sperren / entsperren", null, delegate { main.Dispatcher.Invoke(new Action(ToggleLock)); });
-      menu.Items.Add(new Forms.ToolStripSeparator());
-      menu.Items.Add("Anzeige beenden", null, delegate { main.Dispatcher.Invoke(new Action(Exit)); });
-      tray.ContextMenuStrip = menu;
+      BuildTrayMenu();
       tray.DoubleClick += delegate { ShowMain(); };
       tray.Visible = true;
+    }
+    void BuildTrayMenu() {
+      var previous = tray.ContextMenuStrip;
+      var menu = new Forms.ContextMenuStrip();
+      menu.Items.Add(T("openWindow"), null, delegate { main.Dispatcher.Invoke(new Action(ShowMain)); });
+      menu.Items.Add(T("showHud"), null, delegate { main.Dispatcher.Invoke(new Action(ShowHud)); });
+      menu.Items.Add(T("lockHud"), null, delegate { main.Dispatcher.Invoke(new Action(ToggleLock)); });
+      menu.Items.Add(new Forms.ToolStripSeparator());
+      menu.Items.Add(T("exitDisplay"), null, delegate { main.Dispatcher.Invoke(new Action(Exit)); });
+      tray.ContextMenuStrip = menu;
+      if (previous != null) previous.Dispose();
     }
     async Task EnsureBackend() {
       if (backendStarting) return;
@@ -210,7 +244,7 @@ namespace ArmsRaceTracker {
         var settings = json.DeserializeObject(File.ReadAllText(Path.Combine(root, "settings.json")));
         if (Number(settings, "port") > 0) port = Number(settings, "port");
         expectedSteamid = Text(settings, "steamid");
-      } catch (Exception error) { Set(main, "CurrentDetail", "Einrichtung prüfen: " + error.Message); }
+      } catch (Exception) { Set(main, "CurrentDetail", T("setupProblem")); }
       finally { backendStarting = false; }
     }
 
@@ -220,11 +254,11 @@ namespace ArmsRaceTracker {
       try {
         Update(await LoadSummary());
       } catch (Exception error) {
-        Set(main, "CurrentMap", "Empfänger offline"); Set(main, "CurrentDetail", "Start.cmd startet den Empfänger");
+        Set(main, "CurrentMap", T("receiverOffline")); Set(main, "CurrentDetail", T("startReceiver"));
         if (error is InvalidDataException) Set(main,"CurrentDetail",error.Message);
-        Set(main, "StatusText", "Keine Verbindung zum lokalen Empfänger");
+        Set(main, "StatusText", T("noLocalConnection"));
         ((System.Windows.Shapes.Ellipse)main.FindName("StatusDot")).Fill = Brush("#BE7665");
-        Set(hud, "HudMap", "Empfänger offline"); Set(hud, "HudState", "Keine Verbindung");
+        Set(hud, "HudMap", T("receiverOffline")); Set(hud, "HudState", T("noConnection"));
       } finally { busy = false; }
     }
 
@@ -275,41 +309,43 @@ namespace ArmsRaceTracker {
     }
     void CheckAccount(object status) {
       if (!string.IsNullOrEmpty(expectedSteamid) && Text(status,"steamid") != expectedSteamid)
-        throw new InvalidDataException("Anderer Account aktiv. Alten Empfänger zuerst stoppen.");
+        throw new InvalidDataException(T("wrongAccount"));
     }
     void Update(object payload) {
+      lastSummary = payload;
       var stats = Value(payload, "stats"); var status = Value(payload, "status"); var current = Value(status, "lastGameState");
       int wins = Number(stats, "wins");
       Set(main, "WinNumber", wins.ToString("00")); Set(hud, "HudWins", wins.ToString("00"));
       Set(main, "PracticeNumber", Number(stats, "practiceExcluded").ToString());
       var lastWin = Value(payload, "lastWin");
-      Set(main, "LastWinMap", lastWin == null ? "Noch kein Sieg" : MapName(Text(lastWin, "map")));
-      Set(main, "LastWinTime", lastWin == null ? "Wird automatisch erfasst" : LocalTime(Text(lastWin, "endedAt"), "dd. MMM, HH:mm"));
+      Set(main, "LastWinMap", lastWin == null ? T("noWinYet") : MapName(Text(lastWin, "map")));
+      Set(main, "LastWinTime", lastWin == null ? T("recordedAutomatically") : LocalTime(Text(lastWin, "endedAt"), "lastWinDateFormat"));
       DateTimeOffset received;
       bool fresh = DateTimeOffset.TryParse(Text(status, "lastReceived"), out received) && (DateTimeOffset.UtcNow - received).TotalSeconds <= 18;
       string map = Text(current, "map"); string connection = Text(Value(status, "connection"), "type");
       string stateText, detail, stateColor;
-      if (!fresh) { stateText = "Warte auf CS2"; detail = "Empfänger bereit. CS2 starten."; stateColor = "#8795A8"; }
-      else if (string.IsNullOrEmpty(map)) { stateText = "Hauptmenü"; detail = "Bereit für das nächste Match"; stateColor = "#8795A8"; }
-      else if (connection == "local_practice") { stateText = MapName(map); detail = "Übung. Wird nicht mitgezählt."; stateColor = "#C3AB80"; }
-      else if (connection == "online") { stateText = MapName(map); detail = Text(current, "phase") == "gameover" ? "Online-Match beendet" : "Online. Tracking aktiv."; stateColor = "#86B99F"; }
-      else { stateText = MapName(map); detail = "Verbindung noch ungeprüft"; stateColor = "#C3AB80"; }
+      if (!fresh) { stateText = T("waitingForCs2"); detail = T("receiverReady"); stateColor = "#8795A8"; }
+      else if (string.IsNullOrEmpty(map)) { stateText = T("mainMenu"); detail = T("readyNextMatch"); stateColor = "#8795A8"; }
+      else if (connection == "local_practice") { stateText = MapName(map); detail = T("practiceStatus"); stateColor = "#C3AB80"; }
+      else if (connection == "online") { stateText = MapName(map); detail = Text(current, "phase") == "gameover" ? T("onlineEnded") : T("onlineActive"); stateColor = "#86B99F"; }
+      else { stateText = MapName(map); detail = T("connectionUnverified"); stateColor = "#C3AB80"; }
       Set(main, "CurrentMap", stateText); Set(main, "CurrentDetail", detail);
-      Set(hud, "HudMap", stateText); Set(hud, "HudState", fresh && !string.IsNullOrEmpty(map) ? detail : "Bereit. Nur Online-Siege zählen.");
-      Set(main, "StatusText", "Lokal verbunden  /  Account " + Text(status, "steamid"));
+      Set(hud, "HudMap", stateText); Set(hud, "HudState", fresh && !string.IsNullOrEmpty(map) ? detail : T("readyOnlineOnly"));
+      Set(main, "StatusText", T("accountStatus", Text(status, "steamid")));
       ((System.Windows.Shapes.Ellipse)main.FindName("StatusDot")).Fill = Brush(stateColor);
       Label(hud, "HudState").Foreground = Brush(stateColor);
-      Set(main, "HistoryCount", Number(stats, "completedMatches") + " erfasste Matches");
+      int matches = Number(stats, "completedMatches");
+      Set(main, "HistoryCount", T(matches == 1 ? "matchesOne" : "matchesOther", matches));
       var history = Value(payload, "history") as object[];
       if (history == null) history = new object[0];
       string fingerprint = json.Serialize(history);
       if (fingerprint != historyFingerprint) { DrawHistory(history); historyFingerprint = fingerprint; }
-      if (tray != null) tray.Text = "Arms Race: " + wins + " Siege";
+      if (tray != null) tray.Text = T(wins == 1 ? "trayWinsOne" : "trayWinsOther", wins);
     }
     void DrawHistory(object[] history) {
       var rows = (StackPanel)main.FindName("HistoryRows"); rows.Children.Clear();
       if (history.Length == 0) {
-        rows.Children.Add(new TextBlock { Text = "Dein erstes Match erscheint hier automatisch.", Margin = new Thickness(0,25,0,25), Foreground = Brush("#9BA7B6"), FontSize = 12 });
+        rows.Children.Add(new TextBlock { Text = T("emptyHistory"), Margin = new Thickness(0,25,0,25), Foreground = Brush("#9BA7B6"), FontSize = 12 });
         return;
       }
       foreach (var match in history) {
@@ -322,10 +358,10 @@ namespace ArmsRaceTracker {
         Grid.SetColumnSpan(line, 4); row.Children.Add(line);
         AddCell(row, 0, MapName(Text(match, "map")), "#D9E0E9", 12);
         string outcome = Text(match, "outcome");
-        string label = outcome == "win" ? "Sieg" : outcome == "practice" ? "Übung ignoriert" : outcome == "no_win" ? "Kein Sieg" : outcome == "partial" ? "Unvollständig" : "Noch ungeprüft";
+        string label = T(outcome == "win" ? "outcomeWin" : outcome == "practice" ? "outcomePractice" : outcome == "no_win" ? "outcomeNoWin" : outcome == "partial" ? "outcomePartial" : "outcomeUnverified");
         AddCell(row, 1, label, outcome == "win" ? "#F3A465" : outcome == "practice" ? "#A1ACBB" : "#9CA7B6", 11);
         AddCell(row, 2, Text(match,"kills","–") + " / " + Text(match,"deaths","–"), "#9CA7B6", 11);
-        var time = AddCell(row, 3, LocalTime(Text(match,"endedAt"), "dd.MM. HH:mm"), "#8795A6", 10);
+        var time = AddCell(row, 3, LocalTime(Text(match,"endedAt"), "historyDateFormat"), "#8795A6", 10);
         time.HorizontalAlignment = HorizontalAlignment.Right;
         rows.Children.Add(row);
       }
@@ -335,7 +371,7 @@ namespace ArmsRaceTracker {
       Grid.SetColumn(label, column); row.Children.Add(label); return label;
     }
     public void Show() {
-      CreateTray(); main.Show(); timer.Start();
+      CreateTray(); if (startWithHud) ShowHud(); else main.Show(); timer.Start();
       main.Dispatcher.BeginInvoke(new Action(async delegate { await EnsureBackend(); await Refresh(); }));
     }
     public void Preview(string output) {
@@ -370,7 +406,17 @@ namespace ArmsRaceTracker {
         } catch (Exception error) {
           Directory.CreateDirectory(Path.Combine(root,"data"));
           File.WriteAllText(Path.Combine(root,"data","gui-error.log"), error.ToString());
-          MessageBox.Show("Die Anzeige konnte nicht starten. Details stehen in data/gui-error.log.\n\n" + error.Message, "Arms Race Tracker", MessageBoxButton.OK, MessageBoxImage.Error);
+          string message = "The display could not start. Details are in data/gui-error.log.", title = "Arms Race Tracker";
+          try {
+            var language = new Translations(root);
+            string preferences = Path.Combine(root,"data","ui-settings.json");
+            if (File.Exists(preferences)) {
+              var settings = new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(preferences));
+              if (settings.ContainsKey("language")) language.Select(Convert.ToString(settings["language"]));
+            }
+            message = language.Get("startupError"); title = language.Get("appTitle");
+          } catch { }
+          MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error);
         }
       }
     }

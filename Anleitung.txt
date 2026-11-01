@@ -9,12 +9,18 @@ den Parameter -condebug ergaenzen. Vorhandene Parameter beibehalten.
 CS2 nach der ersten Einrichtung vollstaendig neu starten.
 
 GUI und HUD
+Die Oberfläche startet auf Englisch. Oben im Fenster kannst du zwischen
+English, Deutsch und Dansk wählen. Die Auswahl gilt auch für das HUD
+und wird gespeichert. Auf Deutsch heißt der Spielmodus Wettrüsten.
+
 Strg + Alt + H: Fenster / HUD wechseln
 Strg + Alt + L: HUD sperren / entsperren
 Das entsperrte HUD kann mit der Maus verschoben werden.
 Das gesperrte HUD laesst Mausklicks zum Spiel durch.
 Das Tracker-Symbol im Windows-Infobereich bietet dieselben Befehle.
-Fuer die HUD-Anzeige CS2 auf Vollbild-Fenster stellen.
+Für die HUD-Anzeige CS2 auf „Vollbildfenster“ stellen und „HUD anzeigen“
+anklicken. Exklusives Vollbild kann das HUD verdecken.
+Die letzte Fenster-/HUD-Ansicht wird beim nächsten Start wiederhergestellt.
 
 Die Anzeige schliessen beendet nicht den Hintergrundzaehler.
 Stop.cmd beendet den Empfaenger. Start.cmd startet ihn wieder.

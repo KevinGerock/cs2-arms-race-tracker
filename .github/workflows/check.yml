@@ -16,7 +16,10 @@ jobs:
         with:
           node-version: '24'
       - name: Test match detection and connection filtering
-        run: node --test tests/counter.test.cjs
+        run: node --test tests/*.test.cjs
       - name: Build Windows GUI
         shell: powershell
         run: ./Build.ps1
+      - name: Check language switching, persistence and font coverage
+        shell: powershell
+        run: ./tests/ui.test.ps1
